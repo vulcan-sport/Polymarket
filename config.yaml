@@ -1,0 +1,23 @@
+risk:
+  # "confirm" = Claude proposes, you approve before execution
+  # "autonomous" = Claude executes within limits without asking
+  approval_mode: confirm
+  max_position_size_usdc: 100
+  max_total_exposure_usdc: 500
+  daily_loss_limit_usdc: 50
+  min_edge_threshold: 0.03      # minimum probability edge to consider a trade
+  max_kelly_fraction: 0.25      # cap Kelly bet at 25% of theoretical size
+
+loop:
+  poll_interval_seconds: 60
+  max_markets_per_scan: 50
+  thesis_refresh_hours: 6       # how often Claude re-evaluates thesis validity
+
+api:
+  clob_host: "https://clob.polymarket.com"
+  gamma_host: "https://gamma-api.polymarket.com"
+  data_host: "https://data-api.polymarket.com"
+  pricing_engine: "kelly_criterion"   # swap to HFT engine name to plug in
+  claude_model: "claude-opus-4-6"
+  chain_id: 137                       # Polygon mainnet
+  signature_type: 0                   # 0=EOA wallet, 1=Magic/email, 2=Proxy
