@@ -1,6 +1,7 @@
+import json
 from datetime import datetime
 from typing import Any
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 
 class Token(BaseModel):
@@ -67,6 +68,24 @@ class Market(BaseModel):
     last_trade_price: float | None = None
     # Raw clob token IDs [yes_token_id, no_token_id]
     clob_token_ids: list[str] = Field(default_factory=list)
+
+    @field_validator("clob_token_ids", mode="before")
+    @classmethod
+    def parse_clob_token_ids(cls, v: object) -> list[str]:
+        if isinstance(v, list):
+            return v
+        if isinstance(v, str):
+            v = v.strip()
+            if not v:
+                return []
+            try:
+                parsed = json.loads(v)
+                if isinstance(parsed, list):
+                    return parsed
+            except (json.JSONDecodeError, ValueError):
+                pass
+            return [s.strip() for s in v.split(",") if s.strip()]
+        return []
 
     @property
     def yes_token_id(self) -> str | None:

@@ -83,17 +83,30 @@ class DataConnector:
 
     @staticmethod
     def _parse_position(raw: dict[str, Any]) -> Position:
-        asset = raw.get("asset", raw)
+        asset_raw = raw.get("asset", {})
+        if isinstance(asset_raw, dict):
+            # Legacy / mock format: asset is a nested dict
+            token_id = asset_raw.get("token_id", raw.get("token_id", ""))
+            market_id = asset_raw.get("market", raw.get("conditionId", raw.get("market_id", "")))
+            outcome = asset_raw.get("outcome", raw.get("outcome", "YES"))
+            current_price = float(asset_raw.get("price", raw.get("curPrice", raw.get("current_price", 0))))
+            market_question = asset_raw.get("question", raw.get("title", raw.get("question", "")))
+        else:
+            # Real Polymarket Data API: asset is the token ID string
+            token_id = str(asset_raw) if asset_raw else raw.get("token_id", "")
+            market_id = raw.get("conditionId", raw.get("market_id", ""))
+            outcome = raw.get("outcome", "YES")
+            current_price = float(raw.get("curPrice", raw.get("current_price", 0)))
+            market_question = raw.get("title", raw.get("question", ""))
+
         return Position(
-            market_id=asset.get("market", raw.get("market_id", "")),
-            token_id=asset.get("token_id", raw.get("token_id", "")),
-            outcome=asset.get("outcome", raw.get("outcome", "YES")),
+            market_id=market_id,
+            token_id=token_id,
+            outcome=outcome,
             size=float(raw.get("size", 0)),
             avg_price=float(raw.get("avgPrice", raw.get("avg_price", 0))),
-            current_price=float(
-                asset.get("price", raw.get("current_price", 0))
-            ),
-            market_question=asset.get("question", raw.get("question", "")),
+            current_price=current_price,
+            market_question=market_question,
         )
 
     @staticmethod

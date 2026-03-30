@@ -38,6 +38,18 @@ MOCK_POSITION = {
     "avgPrice": 0.45,
 }
 
+# Real Polymarket Data API format: asset is a plain string (token ID)
+MOCK_POSITION_REAL_API = {
+    "proxyWallet": "0xuser123",
+    "asset": "tok_yes",
+    "outcome": "Yes",
+    "title": "Will the US pass crypto legislation in 2026?",
+    "conditionId": "0xabc123",
+    "size": 100.0,
+    "avgPrice": 0.45,
+    "curPrice": 0.52,
+}
+
 
 class TestGammaConnector:
     @pytest.mark.asyncio
@@ -95,3 +107,63 @@ class TestDataConnector:
         assert "total_pnl" in pnl
         # Position: 100 shares, avg 0.45, current 0.52 → unrealized = (0.52-0.45)*100 = 7.0
         assert pnl["unrealized_pnl"] == pytest.approx(7.0, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_get_positions_real_api_format(self, httpx_mock: HTTPXMock) -> None:
+        """Bug #2: asset is a string in the real Data API, not a nested dict."""
+        wallet = "0xuser123"
+        httpx_mock.add_response(json=[MOCK_POSITION_REAL_API])
+        connector = DataConnector("https://data-api.polymarket.com", wallet)
+        positions = await connector.get_positions()
+        assert len(positions) == 1
+        pos = positions[0]
+        assert isinstance(pos, Position)
+        assert pos.token_id == "tok_yes"
+        assert pos.market_id == "0xabc123"
+        assert pos.outcome == "Yes"
+        assert pos.size == 100.0
+        assert pos.avg_price == pytest.approx(0.45)
+        assert pos.current_price == pytest.approx(0.52)
+        assert pos.market_question == "Will the US pass crypto legislation in 2026?"
+
+
+class TestMarketModel:
+    def test_clob_token_ids_list_passthrough(self) -> None:
+        """A proper list is stored as-is."""
+        m = Market(condition_id="0x1", question="Q?", clob_token_ids=["tok_yes", "tok_no"])
+        assert m.clob_token_ids == ["tok_yes", "tok_no"]
+        assert m.yes_token_id == "tok_yes"
+        assert m.no_token_id == "tok_no"
+
+    def test_clob_token_ids_json_string(self) -> None:
+        """Bug #1: JSON-encoded string from the API is parsed into a list."""
+        m = Market(condition_id="0x1", question="Q?", clob_token_ids='["tok_yes","tok_no"]')
+        assert m.clob_token_ids == ["tok_yes", "tok_no"]
+        assert m.yes_token_id == "tok_yes"
+        assert m.no_token_id == "tok_no"
+
+    def test_clob_token_ids_csv_string(self) -> None:
+        """Comma-separated string is split into a list."""
+        m = Market(condition_id="0x1", question="Q?", clob_token_ids="tok_yes,tok_no")
+        assert m.clob_token_ids == ["tok_yes", "tok_no"]
+        assert m.yes_token_id == "tok_yes"
+        assert m.no_token_id == "tok_no"
+
+    def test_clob_token_ids_empty_string(self) -> None:
+        """Empty string yields an empty list."""
+        m = Market(condition_id="0x1", question="Q?", clob_token_ids="")
+        assert m.clob_token_ids == []
+        assert m.yes_token_id is None
+
+
+class TestGammaConnectorStringTokenIds:
+    @pytest.mark.asyncio
+    async def test_search_markets_with_string_clob_token_ids(self, httpx_mock: HTTPXMock) -> None:
+        """Bug #1: clobTokenIds returned as a JSON string by the API."""
+        mock_market_str_ids = {**MOCK_MARKET, "clobTokenIds": '["tok_yes","tok_no"]'}
+        httpx_mock.add_response(json=[mock_market_str_ids])
+        connector = GammaConnector("https://gamma-api.polymarket.com")
+        markets = await connector.search_markets("crypto", min_liquidity=0.0)
+        assert len(markets) == 1
+        assert markets[0].yes_token_id == "tok_yes"
+        assert markets[0].no_token_id == "tok_no"
