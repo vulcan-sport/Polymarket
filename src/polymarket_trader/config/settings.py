@@ -44,8 +44,6 @@ def load_config() -> AppConfig:
         anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY", ""),
         pricing_engine=api_yaml.get("pricing_engine", "kelly_criterion"),
         claude_model=api_yaml.get("claude_model", "claude-opus-4-6"),
-        chain_id=api_yaml.get("chain_id", 137),
-        signature_type=api_yaml.get("signature_type", 0),
     )
 
     risk = RiskConfig(

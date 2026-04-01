@@ -19,8 +19,6 @@ class APIConfig(BaseModel):
     anthropic_api_key: str = ""
     pricing_engine: str = "kelly_criterion"
     claude_model: str = "claude-opus-4-6"
-    chain_id: int = 137
-    signature_type: int = 0
 
 
 class RiskConfig(BaseModel):

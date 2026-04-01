@@ -1,8 +1,11 @@
 """Tests for connectors (mocked HTTP via pytest-httpx)."""
 
 import pytest
+from unittest.mock import MagicMock
 from pytest_httpx import HTTPXMock
 
+from py_clob_client.clob_types import AssetType, BalanceAllowanceParams
+from polymarket_trader.connectors.clob_connector import CLOBConnector
 from polymarket_trader.connectors.gamma_connector import GammaConnector
 from polymarket_trader.connectors.data_connector import DataConnector
 from polymarket_trader.models.market import Market
@@ -167,3 +170,26 @@ class TestGammaConnectorStringTokenIds:
         assert len(markets) == 1
         assert markets[0].yes_token_id == "tok_yes"
         assert markets[0].no_token_id == "tok_no"
+
+
+class TestCLOBConnector:
+    @pytest.mark.asyncio
+    async def test_get_balance_passes_typed_params(self) -> None:
+        """Bug fix: get_balance must pass BalanceAllowanceParams dataclass, not a dict."""
+        mock_client = MagicMock()
+        mock_client.get_balance_allowance.return_value = {"balance": 50_000_000}  # 50 USDC
+
+        connector = CLOBConnector.__new__(CLOBConnector)
+        connector._client = mock_client
+
+        balance = await connector.get_balance()
+
+        mock_client.get_balance_allowance.assert_called_once()
+        call_args = mock_client.get_balance_allowance.call_args
+        params_arg = call_args.kwargs.get("params") or call_args.args[0]
+
+        assert isinstance(params_arg, BalanceAllowanceParams), (
+            f"Expected BalanceAllowanceParams, got {type(params_arg).__name__}"
+        )
+        assert params_arg.asset_type == AssetType.COLLATERAL
+        assert balance == pytest.approx(50.0)

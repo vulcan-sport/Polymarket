@@ -13,7 +13,7 @@ from typing import Any
 
 from loguru import logger
 from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import ApiCreds, OrderArgs, OrderType
+from py_clob_client.clob_types import ApiCreds, AssetType, BalanceAllowanceParams, OrderArgs, OrderType
 from py_clob_client.order_builder.constants import BUY, SELL
 
 from ..config.schema import AppConfig
@@ -132,7 +132,10 @@ class CLOBConnector:
     async def get_balance(self) -> float:
         """Returns USDC balance available for trading."""
         client = self._require_client()
-        raw = await asyncio.to_thread(client.get_balance_allowance, params={"asset_type": 0})
+        raw = await asyncio.to_thread(
+            client.get_balance_allowance,
+            params=BalanceAllowanceParams(asset_type=AssetType.COLLATERAL),
+        )
         return float(raw.get("balance", 0.0)) / 1e6  # USDC has 6 decimals
 
     async def get_open_orders(self) -> list[Order]:
